@@ -1,0 +1,43 @@
+program     ::= { line }
+line        ::= number statement
+
+statement   ::= let-stmt
+              | print-stmt
+              | input-stmt
+              | goto-stmt
+              | if-stmt
+              | gosub-stmt
+              | return-stmt
+              | end-stmt
+              | rem-stmt
+
+let-stmt    ::= (LET)? var '=' expr
+
+print-stmt  ::= PRINT print-list
+print-list  ::= print-item { (';' | ',') print-item }
+
+print-item  ::= expr | string
+
+input-stmt  ::= INPUT var
+
+goto-stmt   ::= GOTO number
+
+if-stmt     ::= IF expr relop expr THEN number
+
+gosub-stmt  ::= GOSUB number
+
+return-stmt ::= RETURN
+
+end-stmt    ::= END
+
+rem-stmt    ::= REM { any-char }
+
+expr        ::= term { ('+' | '-') term }
+term        ::= factor { ('*' | '/') factor }
+factor      ::= number | var | '(' expr ')'
+
+relop       ::= '=' | '<>' | '<' | '>' | '<=' | '>='
+
+var         ::= 'A'..'Z'
+number      ::= digit { digit }
+string      ::= '"' { char } '"'
