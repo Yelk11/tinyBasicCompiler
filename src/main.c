@@ -52,6 +52,7 @@ int main()
 
 
     lexer *lex = init_lexer(buffer);
+    
     return 0;
 }
 

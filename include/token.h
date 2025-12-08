@@ -13,20 +13,23 @@
 | End-of-line | Implicit at each program line                       | Helps parser detect end of statement  |
 */
 
+enum token_type
+{
+    TOKEN_LINE_NUM,
+    TOKEN_KEYWORD,
+    TOKEN_IDENTIFIER,
+    TOKEN_NUMBER,
+    TOKEN_OPERATOR,
+    TOKEN_PUNCTUATION,
+    TOKEN_STRING,
+    TOKEN_EOL,
+    TOKEN_EOF
+}token_type;
+
 typedef struct token
 {
     char *value;
-    enum
-    {
-        TOKEN_LINE_NUM,
-        TOKEN_KEYWORD,
-        TOKEN_IDENTIFIER,
-        TOKEN_NUMBER,
-        TOKEN_OPERATOR,
-        TOKEN_PUNCTUATION,
-        TOKEN_STRING,
-        TOKEN_EOL
-    }type;
+    enum token_type type;
 } token;
 
 token *init_token(char *value, int type);
