@@ -30,7 +30,8 @@ char *type_to_string(int token)
         return "TOKEN_STRING";
     case TOKEN_EOL:
         return "TOKEN_EOL";
-
+    case TOKEN_EOF:
+        return "TOKEN_EOF";
     }
     return "nope";
 }

@@ -9,6 +9,7 @@
 enum node_type
 {
     PROGRAM,
+    LINE,
     LET_STATEMENT,
     PRINT_STATEMENT,
     IF_STATEMENT,
@@ -21,15 +22,18 @@ enum node_type
     STRING_LITERAL
 };
 typedef struct ast{
-    struct ast* right;
-    struct ast* left;
+    struct ast** child;
+    int child_num;
+    int child_cap;
     token* tok;
     enum node_type type;
 }ast;
 
-ast *init_node(enum node_type type, token* token);
+ast* init_node(enum node_type type, token* tok);
 
-int expect(token* tok);
+void ast_add_child(ast* parent, ast* child);
+
+
 
 
 #endif

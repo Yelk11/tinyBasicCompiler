@@ -1,5 +1,7 @@
 #include "stdio.h"
 #include "lex.h"
+#include "token.h"
+#include "parse.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -52,6 +54,14 @@ int main()
 
 
     lexer *lex = init_lexer(buffer);
+    ast* n = parse(lex);
+    token *tok;
+    do{
+        tok = next_token(lex);
+        printf("%s\n",type_to_string(tok->type));
+    }while(tok->type != TOKEN_EOF);
+    
+    
     
     return 0;
 }

@@ -16,6 +16,8 @@ token* next_token(lexer* lex);
 
 char lexer_peek(lexer* lex);
 
+token *lexer_peek_next_token(lexer *lex);
+
 char advance_lexer(lexer* lex);
 
 token* lexer_parse_string(lexer* lex);

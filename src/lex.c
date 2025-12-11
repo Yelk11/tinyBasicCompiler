@@ -37,6 +37,12 @@ char lexer_peek(lexer *lex)
     return lex->src[lex->pos];
 }
 
+token *lexer_peek_next_token(lexer *lex)
+{
+    lexer temp_lexer = *lex;
+    return next_token(&temp_lexer);
+}
+
 char advance_lexer(lexer *lex)
 {
     char c = lex->src[lex->pos++];
@@ -117,6 +123,9 @@ token *next_token(lexer *lex)
     else if (c=='(' || c==')' || c==',' || c==';')
     {
         return lexer_parse_punctuation(lex);
+    }else if(c=='"')
+    {
+        return lexer_parse_string(lex);
     }
 
     printf("ERROR: Unexpected character '%c' at line %d col %d\n",
