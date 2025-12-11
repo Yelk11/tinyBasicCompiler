@@ -33,6 +33,9 @@ ast* init_node(enum node_type type, token* tok);
 
 void ast_add_child(ast* parent, ast* child);
 
+const char* node_type_to_string(enum node_type type);
+
+void print_ast(ast* node, int indent);
 
 
 

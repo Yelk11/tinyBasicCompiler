@@ -2,51 +2,50 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
-#include <unistd.h>
 
 #include "lex.h"
 #include "token.h"
 
+// -------------------- Keyword check --------------------
 static int is_keyword(const char *s)
 {
     if (!s) return 0;
+
     static const char *kw[] = {
         "LET", "PRINT", "IF", "THEN", "GOTO",
         "GOSUB", "RETURN", "END", "INPUT", "REM",
         NULL
     };
+
     for (int i = 0; kw[i]; ++i) {
         if (strcasecmp(s, kw[i]) == 0) return 1;
     }
+
     return 0;
 }
 
+// -------------------- Lexer init / helpers --------------------
 lexer *init_lexer(char *src)
 {
-    lexer *lexer = calloc(1, sizeof(struct lexer));
-    lexer->src = src;
-    lexer->pos = 0;
-    lexer->line = 1;
-    lexer->col  = 0;
-    return lexer;
+    lexer *lex = calloc(1, sizeof(lexer));
+    lex->src = src;
+    lex->pos = 0;
+    lex->line = 1;
+    lex->col = 0;
+    return lex;
 }
 
-char lexer_peek(lexer *lex)
-{
-    return lex->src[lex->pos];
-}
+char lexer_peek(lexer *lex) { return lex->src[lex->pos]; }
 
 token *lexer_peek_next_token(lexer *lex)
 {
-    lexer temp_lexer = *lex;
-    return next_token(&temp_lexer);
+    lexer temp = *lex;
+    return next_token(&temp);
 }
 
 char advance_lexer(lexer *lex)
 {
     char c = lex->src[lex->pos++];
-
     if (c == '\n') {
         lex->line++;
         lex->col = 0;
@@ -58,152 +57,134 @@ char advance_lexer(lexer *lex)
 
 void skip_whitespace(lexer *lex)
 {
-    while (lex->src[lex->pos] == 13 ||
-           lex->src[lex->pos] == 10 ||
-           lex->src[lex->pos] == ' '  ||
+    while (lex->src[lex->pos] == ' ' ||
            lex->src[lex->pos] == '\t' ||
-           lex->src[lex->pos] == '\n')
+           lex->src[lex->pos] == '\r')
     {
         advance_lexer(lex);
     }
 }
 
-void skip_comment(lexer* lex)
-{
-    // Detect "REM"
-    int start = lex->pos;
 
-    if (toupper(lex->src[start])   == 'R' &&
-        toupper(lex->src[start+1]) == 'E' &&
-        toupper(lex->src[start+2]) == 'M')
-    {
-        // consume REM
-        advance_lexer(lex);
-        advance_lexer(lex);
-        advance_lexer(lex);
 
-        // skip until end of line
-        while (lexer_peek(lex) != '\n' && lexer_peek(lex) != '\0') {
-            advance_lexer(lex);
-        }
-    }
-}
-
+// -------------------- Tokenizer --------------------
 token *next_token(lexer *lex)
 {
     skip_whitespace(lex);
-    skip_comment(lex);
-    skip_whitespace(lex);
 
-    char c = lex->src[lex->pos];
 
-    if (c == '\0')
+    char c = lexer_peek(lex);
+
+    if (c == '\0') 
+    {
         return init_token(NULL, TOKEN_EOF);
+    }
 
-    // Line num
-    if (isdigit(c))
+    if (isdigit(c)) 
     {
         if (lex->col == 0)
+        {
             return lexer_parse_line_num(lex);
-        else
+        }
+        else 
+        {
             return lexer_parse_number(lex);
+        }
     }
-    // identifier / keyword
-    else if (isalpha(c))
+    if (isalpha(c)) 
     {
         return lexer_parse_identifier(lex);
     }
-    // operators
-    else if (c=='+' || c=='-' || c=='*' || c=='/' ||
-             c=='=' || c=='<' || c=='>' )
+    if(c == '\n')
+    {
+        advance_lexer(lex);
+        return init_token("\n", TOKEN_EOL);
+    }
+    if (c=='+' || c=='-' || c=='*' || c=='/' || c=='=' || c=='<' || c=='>')  
     {
         return lexer_parse_operator(lex);
     }
-    // punctuation
-    else if (c=='(' || c==')' || c==',' || c==';')
+    if (c=='(' || c==')' || c==',' || c==';') 
     {
         return lexer_parse_punctuation(lex);
-    }else if(c=='"')
+    }
+    if (c=='"') 
     {
         return lexer_parse_string(lex);
     }
 
-    printf("ERROR: Unexpected character '%c' at line %d col %d\n",
-           c, lex->line, lex->col);
+    fprintf(stderr, "ERROR: Unexpected character '%c' at line %d col %d\n",
+            c, lex->line, lex->col);
     advance_lexer(lex);
     return NULL;
 }
 
-// -------------------- PARSER HELPERS --------------------
-
+// -------------------- Token parsers --------------------
 token *lexer_parse_string(lexer *lex)
 {
-    char *value = calloc(1, 1);
     advance_lexer(lex); // skip opening "
+    size_t cap = 16;
+    size_t len = 0;
+    char *buf = malloc(cap);
+    buf[0] = '\0';
 
-    while (lex->src[lex->pos] != '"' && lex->src[lex->pos] != '\0')
+    while (lexer_peek(lex) != '"' && lexer_peek(lex) != '\0')
     {
-        size_t len = strlen(value);
-        value = realloc(value, len + 2);
-        value[len] = lex->src[lex->pos];
-        value[len+1] = 0;
-        advance_lexer(lex);
+        if (len+1 >= cap) {
+            cap *= 2;
+            buf = realloc(buf, cap);
+        }
+        buf[len++] = advance_lexer(lex);
+        buf[len] = '\0';
     }
-
     advance_lexer(lex); // skip closing "
-    return init_token(value, TOKEN_STRING);
+    return init_token(buf, TOKEN_STRING);
 }
 
 token *lexer_parse_line_num(lexer *lex)
 {
-    char *value = calloc(1,1);
+    size_t cap = 16;
+    size_t len = 0;
+    char *buf = malloc(cap);
 
-    while (isdigit(lex->src[lex->pos]))
-    {
-        size_t len = strlen(value);
-        value = realloc(value, len + 2);
-        value[len] = lex->src[lex->pos];
-        value[len+1] = 0;
-        advance_lexer(lex);
+    while (isdigit(lexer_peek(lex))) {
+        if (len+1 >= cap) buf = realloc(buf, cap*2);
+        buf[len++] = advance_lexer(lex);
+        buf[len] = '\0';
     }
 
-    return init_token(value, TOKEN_LINE_NUM);
+    return init_token(buf, TOKEN_LINE_NUM);
 }
 
 token *lexer_parse_identifier(lexer *lex)
 {
-    char *value = calloc(1,1);
+    size_t cap = 16;
+    size_t len = 0;
+    char *buf = malloc(cap);
 
-    while (isalnum(lex->src[lex->pos]))
-    {
-        size_t len = strlen(value);
-        value = realloc(value, len + 2);
-        value[len] = lex->src[lex->pos];
-        value[len+1] = 0;
-        advance_lexer(lex);
+    while (isalnum(lexer_peek(lex))) {
+        if (len+1 >= cap) buf = realloc(buf, cap*2);
+        buf[len++] = advance_lexer(lex);
+        buf[len] = '\0';
     }
 
-    // detect keywords (LET, PRINT, IF, GOTO, etc)
-    if (is_keyword(value))
-        return init_token(value, TOKEN_KEYWORD);
-
-    return init_token(value, TOKEN_IDENTIFIER);
+    if (is_keyword(buf)) return init_token(buf, TOKEN_KEYWORD);
+    return init_token(buf, TOKEN_IDENTIFIER);
 }
 
 token *lexer_parse_number(lexer *lex)
 {
-    char *value = calloc(1,1);
+    size_t cap = 16;
+    size_t len = 0;
+    char *buf = malloc(cap);
 
-    while (isdigit(lex->src[lex->pos]))
-    {
-        size_t len = strlen(value);
-        value = realloc(value, len + 2);
-        value[len] = lex->src[lex->pos];
-        value[len+1] = 0;
-        advance_lexer(lex);
+    while (isdigit(lexer_peek(lex))) {
+        if (len+1 >= cap) buf = realloc(buf, cap*2);
+        buf[len++] = advance_lexer(lex);
+        buf[len] = '\0';
     }
 
-    return init_token(value, TOKEN_NUMBER);
+    return init_token(buf, TOKEN_NUMBER);
 }
 
 token *lexer_parse_operator(lexer *lex)

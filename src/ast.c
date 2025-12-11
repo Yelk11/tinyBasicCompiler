@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "ast.h"
@@ -27,4 +28,45 @@ void ast_add_child(ast* parent, ast* child)
     }
 
     parent->child[parent->child_num++] = child;
+}
+
+
+
+// Utility: convert node type enum to string
+const char* node_type_to_string(enum node_type type) 
+{
+    switch(type) {
+        case PROGRAM: return "PROGRAM";
+        case LINE: return "LINE";
+        case LET_STATEMENT: return "LET";
+        case PRINT_STATEMENT: return "PRINT";
+        case IF_STATEMENT: return "IF";
+        case GO_TO_STATEMENT: return "GOTO";
+        case GO_SUB_STATEMENT: return "GOSUB";
+        case RETURN_STATEMENT: return "RETURN";
+        case END_STATEMENT: return "END";
+        case INPUT_STATEMENT: return "INPUT";
+        case EXPRESSION: return "EXPR";
+        case STRING_LITERAL: return "STRING";
+        default: return "UNKNOWN";
+    }
+}
+
+// Recursive function to print AST
+void print_ast(ast* node, int indent)
+{
+    if (!node) return;
+
+    for (int i = 0; i < indent; i++) printf("  "); // indentation
+
+    printf("%s", node_type_to_string(node->type));
+
+    if (node->tok && node->tok->value)
+        printf(" [%s]", node->tok->value);
+
+    printf("\n");
+
+    for (int i = 0; i < node->child_num; i++) {
+        print_ast(node->child[i], indent + 1);
+    }
 }

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
 int main()
 {
     FILE* fp = fopen("test/example.bss", "rb");
@@ -52,19 +53,15 @@ int main()
 
     fclose(fp);
 
-
     lexer *lex = init_lexer(buffer);
+    // token* tok;
+    // do{
+    //     tok = next_token(lex);
+    //     printf("%s\n", type_to_string(tok->type));
+    // }while(tok->type != TOKEN_EOF);
+
     ast* n = parse(lex);
-    token *tok;
-    do{
-        tok = next_token(lex);
-        printf("%s\n",type_to_string(tok->type));
-    }while(tok->type != TOKEN_EOF);
-    
-    
+    print_ast(n, 3);
     
     return 0;
 }
-
-
-

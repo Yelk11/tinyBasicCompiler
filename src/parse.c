@@ -1,186 +1,296 @@
-#include "lex.h"
-#include "ast.h"
-#include "token.h"
-#include "parse.h"
-
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
-int expect(lexer* lex, int type)
+#include "parse.h"
+#include "lex.h"
+#include "token.h"
+#include "ast.h"
+
+// --- helper functions ---
+token *peek(lexer *lex) { return lexer_peek_next_token(lex); }
+token *next(lexer *lex) { return next_token(lex); }
+
+token *expect(lexer *lex, int type)
 {
-    token* tok = next_token(lex);
-    return tok->type == type;
+    token *t = next_token(lex); // consume the next token from the lexer
+    if (!t || t->type != type)
+    { // check if the token exists and is the expected type
+        fprintf(stderr, "Parse error: expected token type %d, got %d\n",
+                type, t ? t->type : -1);
+        exit(1); // abort parsing if the token is not what we expect
+    }
+    return t; // return the token if it's correct
 }
 
+int is_keyword(token *t, const char *kw)
+{
+    return t->type == TOKEN_KEYWORD && strcmp(t->value, kw) == 0;
+}
 
-ast* parse(lexer* lex)
+// --- forward declarations ---
+
+// --- entry point ---
+ast *parse(lexer *lex)
 {
     return parse_program(lex);
 }
 
-
-
-// program     ::= { line }
-ast* parse_program(lexer* lex)
+// --- program ::= { line } ---
+ast *parse_program(lexer *lex)
 {
-    ast* n = calloc(1, sizeof(ast));
-    n->type = PROGRAM;
-    n->child_num = 0;
-    token* tok;
+    ast *prog = init_node(PROGRAM, NULL);
 
-    do{
-        
-        ast_add_child(n, parse_line(lex));
-        tok = lexer_peek_next_token(lex);
-
-    }while(tok->type != TOKEN_EOF);
-    
-
-    return n;
-}
-
-
-// line        ::= number statement
-ast* parse_line(lexer* lex)
-{
-    if(expect(lex, TOKEN_LINE_NUM))
+    while (peek(lex)->type != TOKEN_EOF)
     {
-        return parse_statement(lex);
+        ast *ln = parse_line(lex);
+        ast_add_child(prog, ln);
+
+        if (peek(lex)->type == TOKEN_EOL)
+            next(lex);
     }
+
+    return prog;
 }
 
-/*
-statement   ::= let-stmt
-              | print-stmt
-              | input-stmt
-              | goto-stmt
-              | if-stmt
-              | gosub-stmt
-              | return-stmt
-              | end-stmt
-              | rem-stmt
-*/
-ast* parse_statement(lexer* lex)
+// --- line ::= LINE_NUM statement ---
+ast *parse_line(lexer *lex)
 {
+    // Consume the line number token
+    token *lineTok = expect(lex, TOKEN_LINE_NUM);
 
-    
+    // Create a LINE node with the line number as its token
+    ast *lineNode = init_node(LINE, lineTok);
+
+    // Parse the statement that follows
+    ast *stmt = parse_statement(lex);
+    ast_add_child(lineNode, stmt);
+
+    return lineNode;
 }
 
-/*
-let-stmt    ::= (LET)? var '=' expr
-*/
-ast* parse_let_statement(lexer* lex)
+// --- statement dispatcher ---
+ast *parse_statement(lexer *lex)
 {
+    token *t = peek(lex);
 
-    
-}
-// print-stmt  ::= PRINT print-list
-ast* parse_print_statement(lexer* lex)
-{
+    if (t->type == TOKEN_KEYWORD)
+    {
+        if (is_keyword(t, "LET"))
+            return parse_let(lex);
+        if (is_keyword(t, "PRINT"))
+            return parse_print(lex);
+        if (is_keyword(t, "INPUT"))
+            return parse_input(lex);
+        if (is_keyword(t, "GOTO"))
+            return parse_goto(lex);
+        if (is_keyword(t, "IF"))
+            return parse_if(lex);
+        if (is_keyword(t, "GOSUB"))
+            return parse_gosub(lex);
+        if (is_keyword(t, "RETURN"))
+            return parse_return_stmt(lex);
+        if (is_keyword(t, "END"))
+            return parse_end_stmt(lex);
+        if (is_keyword(t, "REM"))
+            return parse_rem_stmt(lex);
+    }
 
-    
-}
-// print-list  ::= print-item { (';' | ',') print-item }
-ast* parse_print_list(lexer* lex)
-{
+    // implicit LET if line starts with identifier
+    if (t->type == TOKEN_IDENTIFIER)
+        return parse_let(lex);
 
-    
-}
-// print-item  ::= expr | string
-ast* parse_print_item(lexer* lex)
-{
-
-    
-}
-
-// input-stmt  ::= INPUT var
-ast* parse_input_statement(lexer* lex)
-{
-
-    
-}
-
-// goto-stmt   ::= GOTO number
-ast* parse_goto_statement(lexer* lex)
-{
-
-    
+    fprintf(stderr, "Unknown statement token '%s'\n", t->value);
+    exit(1);
 }
 
-// if-stmt     ::= IF expr relop expr THEN number
-ast* parse_if_statement(lexer* lex)
+// --- LET ::= ("LET")? IDENT "=" expr ---
+ast *parse_let(lexer *lex)
 {
+    token *t = peek(lex);
+    if (is_keyword(t, "LET"))
+        next(lex);
 
-    
+    token *var = expect(lex, TOKEN_IDENTIFIER);
+    token *eq = expect(lex, TOKEN_OPERATOR);
+    if (strcmp(eq->value, "=") != 0)
+    {
+        fprintf(stderr, "Expected '=' in LET statement\n");
+        exit(1);
+    }
+
+    ast *node = init_node(LET_STATEMENT, NULL);
+    ast_add_child(node, init_node(EXPRESSION, var));
+    ast_add_child(node, parse_expression(lex));
+    return node;
 }
 
-// gosub-stmt  ::= GOSUB number
-ast* parse_gosub_statement(lexer* lex)
+// --- PRINT ::= "PRINT" expr-or-string {","|";" expr-or-string} ---
+ast *parse_print(lexer *lex)
 {
+    next(lex); // consume PRINT
+    ast *node = init_node(PRINT_STATEMENT, NULL);
+    ast_add_child(node, parse_expression(lex));
 
-    
+    while (peek(lex)->type == TOKEN_PUNCTUATION &&
+           (strcmp(peek(lex)->value, ",") == 0 || strcmp(peek(lex)->value, ";") == 0))
+    {
+        next(lex); // consume separator
+        ast_add_child(node, parse_expression(lex));
+    }
+
+    return node;
 }
 
-// return-stmt ::= RETURN
-ast* parse_return_statement(lexer* lex)
+// --- INPUT ::= "INPUT" IDENT ---
+ast *parse_input(lexer *lex)
 {
-
-    
+    next(lex);
+    token *id = expect(lex, TOKEN_IDENTIFIER);
+    return init_node(INPUT_STATEMENT, id);
 }
 
-// end-stmt    ::= END
-ast* parse_end_statement(lexer* lex)
+// --- GOTO ::= "GOTO" NUMBER ---
+ast *parse_goto(lexer *lex)
 {
-
-    
+    next(lex);
+    token *num = expect(lex, TOKEN_NUMBER);
+    return init_node(GO_TO_STATEMENT, num);
 }
 
-// rem-stmt    ::= REM { any-char }
-ast* parse_rem_statement(lexer* lex)
+// --- IF ::= "IF" expr OP expr THEN NUMBER ---
+ast *parse_if(lexer *lex)
 {
+    next(lex); // IF
+    ast *node = init_node(IF_STATEMENT, NULL);
 
-    
+    ast_add_child(node, parse_expression(lex));
+
+    token *op = expect(lex, TOKEN_OPERATOR);
+    ast_add_child(node, init_node(EXPRESSION, op));
+
+    ast_add_child(node, parse_expression(lex));
+
+    token *thenTok = expect(lex, TOKEN_KEYWORD);
+    if (!is_keyword(thenTok, "THEN"))
+    {
+        fprintf(stderr, "Expected THEN in IF statement\n");
+        exit(1);
+    }
+
+    token *num = expect(lex, TOKEN_NUMBER);
+    ast_add_child(node, init_node(EXPRESSION, num));
+
+    return node;
 }
 
-// expr        ::= term { ('+' | '-') term }
-ast* parse_expression(lexer* lex)
+// --- GOSUB ::= "GOSUB" NUMBER ---
+ast *parse_gosub(lexer *lex)
 {
-
-    
+    next(lex);
+    token *num = expect(lex, TOKEN_NUMBER);
+    return init_node(GO_SUB_STATEMENT, num);
 }
 
-// term        ::= factor { ('*' | '/') factor }
-ast* parse_term(lexer* lex)
+// --- RETURN ::= "RETURN" ---
+ast *parse_return_stmt(lexer *lex)
 {
-
-    
+    next(lex);
+    return init_node(RETURN_STATEMENT, NULL);
 }
-// factor      ::= number | var | '(' expr ')'
-ast* parse_factor(lexer* lex)
-{
 
-    
+// --- END ::= "END" ---
+ast *parse_end_stmt(lexer *lex)
+{
+    next(lex);
+    return init_node(END_STATEMENT, NULL);
 }
-// relop       ::= '=' | '<>' | '<' | '>' | '<=' | '>='
-ast* parse_relop(lexer* lex)
-{
 
-    
+// --- REM ::= "REM" <rest of line> ---
+ast *parse_rem_stmt(lexer *lex)
+{
+    token *rem = next(lex); // consume REM
+    ast *node = init_node(STRING_LITERAL, rem);
+
+    // consume rest of line as string tokens until EOL
+    while (peek(lex)->type != TOKEN_EOL && peek(lex)->type != TOKEN_EOF)
+        next(lex);
+
+    return node;
 }
-// var         ::= 'A'..'Z'
-ast* parse_var(lexer* lex)
-{
 
-    
+// --- Expressions ---
+ast *parse_expression(lexer *lex)
+{
+    ast *left = parse_term(lex);
+
+    while (peek(lex)->type == TOKEN_OPERATOR &&
+           (strcmp(peek(lex)->value, "+") == 0 || strcmp(peek(lex)->value, "-") == 0))
+    {
+        token *op = next(lex);
+        ast *right = parse_term(lex);
+
+        ast *node = init_node(EXPRESSION, op);
+        ast_add_child(node, left);
+        ast_add_child(node, right);
+        left = node;
+    }
+
+    return left;
 }
-// number      ::= digit { digit }
-ast* parse_number(lexer* lex)
-{
 
-    
+ast *parse_term(lexer *lex)
+{
+    ast *left = parse_factor(lex);
+
+    while (peek(lex)->type == TOKEN_OPERATOR &&
+           (strcmp(peek(lex)->value, "*") == 0 || strcmp(peek(lex)->value, "/") == 0))
+    {
+        token *op = next(lex);
+        ast *right = parse_factor(lex);
+
+        ast *node = init_node(EXPRESSION, op);
+        ast_add_child(node, left);
+        ast_add_child(node, right);
+        left = node;
+    }
+
+    return left;
 }
-// string      ::= '"' { char } '"'
-ast* parse_string(lexer* lex)
-{
 
-    
+ast *parse_factor(lexer *lex)
+{
+    token *t = peek(lex);
+
+    if (t->type == TOKEN_NUMBER)
+    {
+        next(lex);
+        return init_node(EXPRESSION, t);
+    }
+    if (t->type == TOKEN_IDENTIFIER)
+    {
+        next(lex);
+        return init_node(EXPRESSION, t);
+    }
+    if (t->type == TOKEN_STRING)
+    {
+        next(lex);
+        return init_node(STRING_LITERAL, t);
+    }
+
+    if (t->type == TOKEN_PUNCTUATION && strcmp(t->value, "(") == 0)
+    {
+        next(lex);
+        ast *e = parse_expression(lex);
+        token *rp = expect(lex, TOKEN_PUNCTUATION);
+        if (strcmp(rp->value, ")") != 0)
+        {
+            fprintf(stderr, "Expected ')'\n");
+            exit(1);
+        }
+        return e;
+    }
+
+    fprintf(stderr, "Unexpected token '%s' in factor\n", t->value);
+    exit(1);
 }
