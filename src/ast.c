@@ -10,25 +10,26 @@ ast* init_node(enum node_type type, token* tok)
     ast* n = calloc(1, sizeof(ast));
     n->type = type;
     n->tok = tok;
-    n->child_num = 0;
-    n->child_cap = INITIAL_CHILD_CAP;
-    n->child = calloc(n->child_cap, sizeof(ast*));
     return n;
 }
 
 void ast_add_child(ast* parent, ast* child)
 {
-    if (parent->child_num >= parent->child_cap) {
-        parent->child_cap *= 2;
-        parent->child = realloc(parent->child,
-                                parent->child_cap * sizeof(ast*));
-        if (!parent->child) {
-            exit(1);
-        }
+    if (!parent || !child)
+        return;
+
+    if (!parent->child) {
+        parent->child = child;
+        return;
     }
 
-    parent->child[parent->child_num++] = child;
+    ast* c = parent->child;
+    while (c->sibling)
+        c = c->sibling;
+
+    c->sibling = child;
 }
+
 
 
 
@@ -57,16 +58,22 @@ void print_ast(ast* node, int indent)
 {
     if (!node) return;
 
-    for (int i = 0; i < indent; i++) printf("  "); // indentation
+    // indent
+    for (int i = 0; i < indent; i++)
+        printf("  ");
 
+    // print node type
     printf("%s", node_type_to_string(node->type));
 
+    // print token if present
     if (node->tok && node->tok->value)
-        printf(" [%s]", node->tok->value);
+        printf(" (%s)", node->tok->value);
 
     printf("\n");
 
-    for (int i = 0; i < node->child_num; i++) {
-        print_ast(node->child[i], indent + 1);
-    }
+    // print children
+    print_ast(node->child, indent + 1);
+
+    // print siblings at same indent
+    print_ast(node->sibling, indent);
 }

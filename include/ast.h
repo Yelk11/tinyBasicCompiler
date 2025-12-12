@@ -21,10 +21,9 @@ enum node_type
     EXPRESSION,
     STRING_LITERAL
 };
-typedef struct ast{
-    struct ast** child;
-    int child_num;
-    int child_cap;
+typedef struct ast {
+    struct ast* child;
+    struct ast* sibling;
     token* tok;
     enum node_type type;
 }ast;

@@ -8,7 +8,7 @@
 
 int main()
 {
-    FILE* fp = fopen("test/example.bss", "rb");
+    FILE* fp = fopen("test/ticTakToe.bss", "rb");
 
 
     if (!fp) {

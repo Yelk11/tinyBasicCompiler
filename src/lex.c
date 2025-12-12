@@ -95,22 +95,69 @@ token *next_token(lexer *lex)
     {
         return lexer_parse_identifier(lex);
     }
-    if(c == '\n')
+    switch(c)
     {
-        advance_lexer(lex);
-        return init_token("\n", TOKEN_EOL);
-    }
-    if (c=='+' || c=='-' || c=='*' || c=='/' || c=='=' || c=='<' || c=='>')  
-    {
-        return lexer_parse_operator(lex);
-    }
-    if (c=='(' || c==')' || c==',' || c==';') 
-    {
-        return lexer_parse_punctuation(lex);
-    }
-    if (c=='"') 
-    {
-        return lexer_parse_string(lex);
+        case '\n':
+            advance_lexer(lex);
+            return init_token("\n", TOKEN_EOL);
+        case '+':
+            advance_lexer(lex);
+            return init_token("+", TOKEN_OPERATOR);
+        case '-':
+            advance_lexer(lex);
+            return init_token("-", TOKEN_OPERATOR);
+        case '*':
+            advance_lexer(lex);
+            return init_token("*", TOKEN_OPERATOR);
+        case '/':
+            advance_lexer(lex);
+            return init_token("/", TOKEN_OPERATOR);
+        case '=':
+            advance_lexer(lex);
+            if(lexer_peek(lex) == '=')
+            {
+                advance_lexer(lex);
+                return init_token("==", TOKEN_OPERATOR);
+            }
+            else
+            {
+                return init_token("=", TOKEN_OPERATOR);
+            }
+        case '<':
+            advance_lexer(lex);
+            if(lexer_peek(lex) == '>')
+            {
+                advance_lexer(lex);
+                return init_token("<>", TOKEN_OPERATOR);
+            }
+            else if(lexer_peek(lex) == '=')
+            {
+                advance_lexer(lex);
+                return init_token("<=", TOKEN_OPERATOR);
+            }
+            else
+            {
+                return init_token("<", TOKEN_OPERATOR);
+            }
+        case '>':
+            advance_lexer(lex);
+            if(lexer_peek(lex) == '=')
+            {
+                advance_lexer(lex);
+                return init_token(">=", TOKEN_OPERATOR);
+            }
+            else
+            {
+                return init_token(">", TOKEN_OPERATOR);
+            }
+        case '(': 
+        case ')':
+        case ',':
+        case ';':
+            return lexer_parse_punctuation(lex);
+        case '"':
+            return lexer_parse_string(lex);
+            
     }
 
     fprintf(stderr, "ERROR: Unexpected character '%c' at line %d col %d\n",
@@ -187,12 +234,7 @@ token *lexer_parse_number(lexer *lex)
     return init_token(buf, TOKEN_NUMBER);
 }
 
-token *lexer_parse_operator(lexer *lex)
-{
-    char op = advance_lexer(lex);
-    char str[2] = { op, 0 };
-    return init_token(strdup(str), TOKEN_OPERATOR);
-}
+
 
 token *lexer_parse_punctuation(lexer *lex)
 {
